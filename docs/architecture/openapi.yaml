@@ -1,0 +1,130 @@
+openapi: 3.0.3
+info:
+  title: Homly API
+  version: 0.1.0
+  description: Contrato inicial MVP para marketplace de servicios locales.
+servers:
+  - url: http://localhost:4000/api
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /auth/signup:
+    post:
+      summary: Registro de usuario
+      responses:
+        '201':
+          description: Usuario creado
+  /auth/login:
+    post:
+      summary: Login usuario
+      responses:
+        '201':
+          description: Login exitoso
+  /providers:
+    get:
+      summary: Listar perfiles de proveedor
+      responses:
+        '200':
+          description: OK
+  /providers/profile:
+    post:
+      summary: Crear o actualizar perfil de proveedor
+      responses:
+        '201':
+          description: Perfil guardado
+  /providers/user/{userId}:
+    get:
+      summary: Obtener perfil de proveedor por userId
+      responses:
+        '200':
+          description: Perfil
+  /catalog/services:
+    get:
+      summary: Listar servicios
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Crear servicio
+      responses:
+        '201':
+          description: Servicio creado
+  /catalog/services/{serviceId}:
+    patch:
+      summary: Actualizar servicio
+      responses:
+        '200':
+          description: Servicio actualizado
+    delete:
+      summary: Eliminar servicio
+      responses:
+        '200':
+          description: Servicio eliminado
+  /availability/weekly:
+    post:
+      summary: Reemplazar disponibilidad semanal
+      responses:
+        '201':
+          description: Disponibilidad guardada
+  /availability/provider/{providerId}:
+    get:
+      summary: Listar disponibilidad por proveedor
+      responses:
+        '200':
+          description: Disponibilidad
+  /analytics/events:
+    get:
+      summary: Listar eventos analiticos
+      responses:
+        '200':
+          description: Eventos
+    post:
+      summary: Registrar evento analitico
+      responses:
+        '201':
+          description: Evento registrado
+  /bookings/status:
+    get:
+      summary: Estado modulo bookings
+      responses:
+        '200':
+          description: OK
+  /payments/status:
+    get:
+      summary: Estado modulo payments
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [customer, provider, admin]
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled]
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [requires_payment_method, requires_confirmation, succeeded, failed, refunded]

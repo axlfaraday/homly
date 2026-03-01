@@ -1,0 +1,90 @@
+erDiagram
+  USERS ||--o{ SESSIONS : has
+  USERS ||--o{ PROVIDER_PROFILE : owns
+  PROVIDER_PROFILE ||--o{ SERVICES : offers
+  PROVIDER_PROFILE ||--o{ AVAILABILITY : defines
+  USERS ||--o{ BOOKINGS : makes
+  PROVIDER_PROFILE ||--o{ BOOKINGS : receives
+  BOOKINGS ||--|| PAYMENTS : charges
+  BOOKINGS ||--o{ REVIEWS : receives
+  BOOKINGS ||--o{ SUPPORT_TICKETS : can_open
+  SUPPORT_TICKETS ||--o{ DISPUTES : escalates
+
+  USERS {
+    uuid id PK
+    string email
+    string phone
+    string role
+    string status
+    datetime created_at
+  }
+
+  PROVIDER_PROFILE {
+    uuid id PK
+    uuid user_id FK
+    string kyc_status
+    string coverage_geo
+    float rating_avg
+  }
+
+  SERVICES {
+    uuid id PK
+    uuid provider_id FK
+    string slug
+    int duration_minutes
+    decimal base_price
+  }
+
+  AVAILABILITY {
+    uuid id PK
+    uuid provider_id FK
+    int weekday
+    time start_time
+    time end_time
+  }
+
+  BOOKINGS {
+    uuid id PK
+    uuid customer_id FK
+    uuid provider_id FK
+    string status
+    datetime scheduled_at
+    decimal total_price
+  }
+
+  PAYMENTS {
+    uuid id PK
+    uuid booking_id FK
+    string provider
+    string intent_id
+    string status
+    decimal amount
+  }
+
+  REVIEWS {
+    uuid id PK
+    uuid booking_id FK
+    int rating
+    string comment
+  }
+
+  SUPPORT_TICKETS {
+    uuid id PK
+    uuid booking_id FK
+    string category
+    string status
+  }
+
+  DISPUTES {
+    uuid id PK
+    uuid ticket_id FK
+    string outcome
+    datetime resolved_at
+  }
+
+  SESSIONS {
+    uuid id PK
+    uuid user_id FK
+    string token_hash
+    datetime expires_at
+  }

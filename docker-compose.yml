@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: homly-postgres
+    environment:
+      POSTGRES_DB: homly
+      POSTGRES_USER: homly
+      POSTGRES_PASSWORD: homly
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: homly-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
