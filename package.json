@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
+    "setup:local": "bash scripts/bootstrap-local.sh",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "db:prepare": "pnpm --filter @homly/api db:generate && pnpm --filter @homly/api db:deploy",
+    "db:seed": "pnpm --filter @homly/api db:seed",
+    "dev": "pnpm --parallel --filter @homly/api --filter @homly/web dev",
     "dev:web": "pnpm --filter @homly/web dev",
     "dev:api": "pnpm --filter @homly/api dev",
     "build": "pnpm -r build",

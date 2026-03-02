@@ -24,9 +24,26 @@ paths:
       responses:
         '201':
           description: Login exitoso
+  /users/me:
+    get:
+      summary: Obtener usuario autenticado
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar usuario autenticado
+      responses:
+        '200':
+          description: Usuario actualizado
   /providers:
     get:
       summary: Listar perfiles de proveedor
+      responses:
+        '200':
+          description: OK
+  /providers/discover:
+    get:
+      summary: Buscar proveedores por ciudad/servicio
       responses:
         '200':
           description: OK
@@ -87,9 +104,68 @@ paths:
       responses:
         '201':
           description: Evento registrado
-  /bookings/status:
+  /bookings:
+    post:
+      summary: Crear reserva
+      responses:
+        '201':
+          description: Reserva creada
+  /bookings/mine:
     get:
-      summary: Estado modulo bookings
+      summary: Listar reservas del usuario autenticado
+      responses:
+        '200':
+          description: OK
+  /bookings/{bookingId}/status:
+    patch:
+      summary: Actualizar estado de reserva
+      responses:
+        '200':
+          description: Reserva actualizada
+  /reviews:
+    post:
+      summary: Crear reseña para una reserva completada
+      responses:
+        '201':
+          description: Reseña creada
+  /reviews/provider/{providerId}:
+    get:
+      summary: Listar reseñas de un proveedor
+      responses:
+        '200':
+          description: OK
+  /support/tickets:
+    post:
+      summary: Crear ticket de soporte
+      responses:
+        '201':
+          description: Ticket creado
+  /support/tickets/mine:
+    get:
+      summary: Listar tickets del usuario autenticado
+      responses:
+        '200':
+          description: OK
+  /support/tickets/{ticketId}/status:
+    patch:
+      summary: Actualizar estado del ticket
+      responses:
+        '200':
+          description: Ticket actualizado
+  /messaging/bookings/{bookingId}/messages:
+    get:
+      summary: Listar mensajes de una reserva
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Enviar mensaje en una reserva
+      responses:
+        '201':
+          description: Mensaje creado
+  /admin/dashboard:
+    get:
+      summary: Dashboard operativo (admin)
       responses:
         '200':
           description: OK

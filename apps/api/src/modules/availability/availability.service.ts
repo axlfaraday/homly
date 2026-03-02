@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/interfaces/auth-user.interface";
 import { UpsertWeeklySlotsDto } from "./dto/upsert-weekly-slots.dto";
@@ -9,6 +9,7 @@ export class AvailabilityService {
 
   async upsertWeeklySlots(payload: UpsertWeeklySlotsDto, user: AuthUser) {
     await this.assertCanManageAvailability(user, payload.providerId);
+    this.assertTimeRanges(payload);
 
     await this.prisma.availabilitySlot.deleteMany({
       where: { providerId: payload.providerId }
@@ -45,6 +46,14 @@ export class AvailabilityService {
 
     if (!ownProfile || ownProfile.id !== providerId) {
       throw new ForbiddenException("provider_can_only_manage_own_availability");
+    }
+  }
+
+  private assertTimeRanges(payload: UpsertWeeklySlotsDto) {
+    for (const slot of payload.slots) {
+      if (slot.startTime >= slot.endTime) {
+        throw new BadRequestException("invalid_slot_time_range");
+      }
     }
   }
 }

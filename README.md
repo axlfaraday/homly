@@ -23,24 +23,53 @@ Marketplace local de servicios para conectar clientes y proveedores con foco en 
 - Iniciar runtime:
   - `colima start --cpu 4 --memory 8 --disk 60`
 
+### Setup recomendado (1 comando)
+
+1. Ejecuta bootstrap local:
+   - `pnpm setup:local`
+2. Levanta ambas apps:
+   - `pnpm dev`
+3. URLs locales:
+   - Web: `http://localhost:3000`
+   - API: `http://localhost:4000/api`
+   - Postgres (Docker): `localhost:55432`
+   - Redis (Docker): `localhost:56379`
+
+### Setup manual (alternativo)
+
 1. Instala dependencias:
    - `pnpm install`
 2. Levanta infraestructura local:
-   - `docker compose up -d`
-3. Copia variables de entorno:
-   - `cp .env.example .env`
-4. Genera cliente Prisma:
-   - `DATABASE_URL=postgresql://homly:homly@localhost:5432/homly pnpm --filter @homly/api db:generate`
-5. Ejecuta migraciones:
-   - `DATABASE_URL=postgresql://homly:homly@localhost:5432/homly pnpm --filter @homly/api db:migrate --name init`
-6. Corre API:
-   - `pnpm --filter @homly/api dev`
-7. Corre Web:
-   - `pnpm --filter @homly/web dev`
+   - `pnpm infra:up`
+3. Crea archivos de entorno:
+   - `cp apps/api/.env.example apps/api/.env`
+   - `cp apps/web/.env.example apps/web/.env.local`
+4. Genera cliente Prisma y aplica migraciones:
+   - `pnpm db:prepare`
+5. Corre API:
+   - `pnpm dev:api`
+6. Corre Web:
+   - `pnpm dev:web`
 
 Variables de auth requeridas:
 - `JWT_SECRET` (obligatoria en API)
 - `JWT_EXPIRES_IN` (ej: `1d`, `12h`)
+- `CORS_ORIGIN` (default local: `http://localhost:3000`)
+
+Variables web relevantes:
+- `NEXT_PUBLIC_API_URL` (default local: `http://localhost:4000/api`)
+- `NEXT_PUBLIC_APP_URL` (default local: `http://localhost:3000`)
+
+Verificacion rapida API:
+- `pnpm --filter @homly/api test:smoke`
+
+Seed demo local:
+- `pnpm db:seed`
+- Usuarios seed:
+  - `admin@homly.local`
+  - `provider@homly.local`
+  - `customer@homly.local`
+- Password seed (todos): `password123`
 
 ## Estructura
 
@@ -56,6 +85,7 @@ Variables de auth requeridas:
 - `GET /api/auth/me` (Bearer token)
 - `POST /api/providers/profile`
 - `GET /api/providers`
+- `GET /api/providers/discover?city=...&service=...&verifiedOnly=true&minRating=4&sortBy=top-rated`
 - `GET /api/providers/user/:userId`
 - `POST /api/catalog/services`
 - `GET /api/catalog/services?providerId=...`
@@ -64,6 +94,19 @@ Variables de auth requeridas:
 - `POST /api/availability/weekly`
 - `GET /api/availability/provider/:providerId`
 - `POST /api/analytics/events`
+- `POST /api/bookings`
+- `GET /api/bookings/mine`
+- `PATCH /api/bookings/:bookingId/status`
+- `POST /api/reviews`
+- `GET /api/reviews/provider/:providerId`
+- `GET /api/users/me`
+- `PATCH /api/users/me`
+- `GET /api/admin/dashboard` (admin)
+- `POST /api/support/tickets`
+- `GET /api/support/tickets/mine`
+- `PATCH /api/support/tickets/:ticketId/status`
+- `GET /api/messaging/bookings/:bookingId/messages`
+- `POST /api/messaging/bookings/:bookingId/messages`
 
 ## RBAC actual
 

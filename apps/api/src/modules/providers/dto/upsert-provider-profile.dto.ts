@@ -1,5 +1,15 @@
 import { Transform } from "class-transformer";
-import { ArrayMinSize, IsArray, IsIn, IsOptional, IsString, MinLength } from "class-validator";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength
+} from "class-validator";
 
 export class UpsertProviderProfileDto {
   @IsString()
@@ -24,4 +34,22 @@ export class UpsertProviderProfileDto {
   @IsOptional()
   @IsIn(["pending", "approved", "rejected"])
   verificationStatus?: "pending" | "approved" | "rejected";
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  teamSize?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  travelBufferMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  serviceRadiusKm?: number;
 }

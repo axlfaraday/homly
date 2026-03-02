@@ -19,14 +19,84 @@ enum VerificationStatus {
   rejected
 }
 
+enum BookingStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+}
+
+enum ProviderPlan {
+  free
+  pro
+  elite
+}
+
+enum PaymentStatus {
+  requires_payment_method
+  requires_confirmation
+  held_in_escrow
+  released
+  refunded
+  failed
+}
+
+enum RefundStatus {
+  pending
+  processed
+  failed
+}
+
+enum ReferralStatus {
+  signed_up
+  qualified
+  rewarded
+}
+
+enum AlertSeverity {
+  low
+  medium
+  high
+}
+
+enum AlertStatus {
+  open
+  acknowledged
+  resolved
+}
+
+enum NudgeStatus {
+  queued
+  sent
+  cancelled
+}
+
 model User {
   id            String            @id @default(uuid())
   email         String            @unique
   passwordHash  String
   role          UserRole
+  referralCode  String?           @unique
+  referredById  String?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   providerProfile ProviderProfile?
+  bookingsAsCustomer Booking[]
+  bookingPlans BookingPlan[]
+  reviewsAuthored Review[]
+  messagesSent Message[]
+  supportTickets SupportTicket[]
+  referralsMade Referral[] @relation("Referrer")
+  referralsReceived Referral[] @relation("Referee")
+  nudges       LifecycleNudge[]
+  referredBy   User?   @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referees     User[]  @relation("UserReferrals")
 }
 
 model ProviderProfile {
@@ -37,12 +107,25 @@ model ProviderProfile {
   city               String
   coverage           String[]
   verificationStatus VerificationStatus @default(pending)
+  plan               ProviderPlan       @default(free)
+  featuredUntil      DateTime?
+  teamSize           Int                @default(1)
+  travelBufferMinutes Int               @default(15)
+  serviceRadiusKm    Int                @default(10)
+  responseRate       Float              @default(1)
+  punctualityRate    Float              @default(1)
+  completionRate     Float              @default(1)
+  noShowRate         Float              @default(0)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   services     MarketplaceService[]
   availability AvailabilitySlot[]
+  bookings     Booking[]
+  reviews      Review[]
+  supportTickets SupportTicket[]
+  bookingPlans BookingPlan[]
 }
 
 model MarketplaceService {
@@ -58,9 +141,204 @@ model MarketplaceService {
   updatedAt       DateTime        @updatedAt
 
   provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  bookingPlans BookingPlan[]
 
   @@index([providerId])
   @@index([slug])
+}
+
+model Booking {
+  id         String        @id @default(uuid())
+  customerId String
+  providerId String
+  serviceId  String
+  scheduledAt DateTime
+  status     BookingStatus @default(pending)
+  notes      String?
+  cancelWindowHours Int    @default(12)
+  cancellationFeePct Int   @default(20)
+  checkInAt  DateTime?
+  checkOutAt DateTime?
+  completionEvidence Json?
+  guaranteeAccepted Boolean @default(true)
+  recurrencePlanId String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service  MarketplaceService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  review   Review?
+  messages Message[]
+  supportTickets SupportTicket[]
+  payment  Payment?
+  alerts   OpsAlert[]
+  recurrencePlan BookingPlan? @relation(fields: [recurrencePlanId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@index([providerId, scheduledAt])
+  @@index([serviceId])
+}
+
+model BookingPlan {
+  id          String   @id @default(uuid())
+  customerId  String
+  providerId  String
+  serviceId   String
+  frequency   String
+  intervalWeeks Int    @default(1)
+  weekday     Int
+  startTime   String
+  nextRunAt   DateTime
+  active      Boolean  @default(true)
+  totalRuns   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service MarketplaceService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([customerId, createdAt])
+  @@index([providerId, active])
+  @@index([nextRunAt, active])
+}
+
+model Payment {
+  id                 String      @id @default(uuid())
+  bookingId          String      @unique
+  amount             Int
+  platformFeeAmount  Int
+  providerPayoutAmount Int
+  status             PaymentStatus @default(requires_payment_method)
+  mockReference      String?
+  paidAt             DateTime?
+  releasedAt         DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds Refund[]
+
+  @@index([status, createdAt])
+}
+
+model Refund {
+  id          String      @id @default(uuid())
+  paymentId   String
+  amount      Int
+  reason      String
+  status      RefundStatus @default(pending)
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  bookingId String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender  User    @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  customerId String
+  providerId String
+  rating     Int
+  comment    String?
+  providerReply String?
+  badgeSnapshot String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  booking  Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, createdAt])
+  @@index([customerId, createdAt])
+}
+
+model Referral {
+  id         String         @id @default(uuid())
+  referrerId String
+  refereeId  String
+  status     ReferralStatus @default(signed_up)
+  rewardCents Int           @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@unique([referrerId, refereeId])
+  @@index([status, createdAt])
+}
+
+model OpsAlert {
+  id         String       @id @default(uuid())
+  bookingId  String?
+  type       String
+  message    String
+  severity   AlertSeverity @default(medium)
+  status     AlertStatus  @default(open)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([status, severity, createdAt])
+}
+
+model LifecycleNudge {
+  id         String      @id @default(uuid())
+  userId     String
+  kind       String
+  channel    String
+  payload    Json
+  status     NudgeStatus @default(queued)
+  scheduledAt DateTime
+  sentAt     DateTime?
+  createdAt  DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, scheduledAt])
+}
+
+model SupportTicket {
+  id             String            @id @default(uuid())
+  bookingId      String?
+  customerId     String
+  providerId     String?
+  subject        String
+  description    String
+  status         SupportTicketStatus @default(open)
+  resolutionNote String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  booking  Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customer User             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider ProviderProfile? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@index([providerId, createdAt])
+  @@index([status, createdAt])
 }
 
 model AvailabilitySlot {

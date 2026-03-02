@@ -1,5 +1,7 @@
 import { Type } from "class-transformer";
-import { ArrayMinSize, IsArray, IsInt, IsString, Max, Min, ValidateNested } from "class-validator";
+import { ArrayMinSize, IsArray, IsInt, IsString, Matches, Max, Min, ValidateNested } from "class-validator";
+
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 class SlotDto {
   @IsInt()
@@ -8,9 +10,11 @@ class SlotDto {
   weekday!: number;
 
   @IsString()
+  @Matches(TIME_24H_REGEX)
   startTime!: string;
 
   @IsString()
+  @Matches(TIME_24H_REGEX)
   endTime!: string;
 }
 
