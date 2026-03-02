@@ -6,12 +6,16 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateCheckoutDto } from "./dto/create-checkout.dto";
 import { RefundPaymentDto } from "./dto/refund-payment.dto";
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   async createCheckout(payload: CreateCheckoutDto, user: AuthUser) {
     const booking = await this.prisma.booking.findUnique({
@@ -62,13 +66,25 @@ export class PaymentsService {
     }
 
     this.assertCanAccessPayment(user, payment.booking.customerId, payment.booking.provider.userId);
-    return this.prisma.payment.update({
+    const updated = await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         status: "held_in_escrow",
         paidAt: new Date()
       }
     });
+
+    await this.pushNotificationSafe(
+      payment.booking.provider.userId,
+      "payment_confirmed",
+      `El pago de la reserva ${bookingId.slice(0, 8)} fue confirmado y quedó en escrow.`,
+      {
+        bookingId,
+        status: updated.status
+      }
+    );
+
+    return updated;
   }
 
   async releasePayout(bookingId: string, user: AuthUser) {
@@ -90,13 +106,25 @@ export class PaymentsService {
       throw new BadRequestException("payment_not_in_escrow");
     }
 
-    return this.prisma.payment.update({
+    const updated = await this.prisma.payment.update({
       where: { id: payment.id },
       data: {
         status: "released",
         releasedAt: new Date()
       }
     });
+
+    await this.pushNotificationSafe(
+      payment.booking.customerId,
+      "payment_released",
+      `El pago de la reserva ${bookingId.slice(0, 8)} fue liberado al proveedor.`,
+      {
+        bookingId,
+        status: updated.status
+      }
+    );
+
+    return updated;
   }
 
   async refund(bookingId: string, payload: RefundPaymentDto, user: AuthUser) {
@@ -132,6 +160,26 @@ export class PaymentsService {
       data: { status: "refunded" }
     });
 
+    await this.pushNotificationSafe(
+      payment.booking.customerId,
+      "payment_refunded",
+      `Se procesó un reembolso para la reserva ${bookingId.slice(0, 8)}.`,
+      {
+        bookingId,
+        amount
+      }
+    );
+
+    await this.pushNotificationSafe(
+      payment.booking.provider.userId,
+      "payment_refunded",
+      `Se procesó un reembolso para la reserva ${bookingId.slice(0, 8)}.`,
+      {
+        bookingId,
+        amount
+      }
+    );
+
     return refund;
   }
 
@@ -165,5 +213,21 @@ export class PaymentsService {
     }
 
     throw new ForbiddenException("payment_access_forbidden");
+  }
+
+  private async pushNotificationSafe(
+    userId: string,
+    kind: string,
+    message: string,
+    payload: Record<string, string | number | boolean | null>
+  ) {
+    try {
+      await this.notifications.notifyInApp(userId, kind, {
+        message,
+        ...payload
+      });
+    } catch {
+      // Non-blocking notification publishing.
+    }
   }
 }

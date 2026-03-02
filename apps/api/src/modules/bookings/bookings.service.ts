@@ -7,6 +7,7 @@ import {
 import type { BookingStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { NotificationsService } from "../notifications/notifications.service";
 import { AddEvidenceDto } from "./dto/add-evidence.dto";
 import { CreateBookingDto } from "./dto/create-booking.dto";
 import { CreateBookingPlanDto } from "./dto/create-booking-plan.dto";
@@ -14,7 +15,10 @@ import { UpdateBookingStatusDto } from "./dto/update-booking-status.dto";
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   async create(payload: CreateBookingDto, user: AuthUser) {
     const service = await this.prisma.marketplaceService.findUnique({
@@ -31,7 +35,7 @@ export class BookingsService {
       throw new BadRequestException("invalid_scheduled_at");
     }
 
-    return this.prisma.booking.create({
+    const booking = await this.prisma.booking.create({
       data: {
         customerId,
         providerId: service.providerId,
@@ -42,12 +46,47 @@ export class BookingsService {
         cancellationFeePct: 20
       }
     });
+
+    await this.pushNotificationSafe(
+      service.provider.userId,
+      "booking_created",
+      `Nueva reserva ${booking.id.slice(0, 8)} para ${scheduledAt.toLocaleString()}.`,
+      {
+        bookingId: booking.id,
+        status: booking.status,
+        serviceId: booking.serviceId
+      }
+    );
+
+    return booking;
   }
 
   async listMine(user: AuthUser) {
     if (user.role === "customer") {
       return this.prisma.booking.findMany({
         where: { customerId: user.userId },
+        include: {
+          service: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              basePrice: true,
+              durationMinutes: true
+            }
+          },
+          provider: {
+            select: {
+              id: true,
+              fullName: true,
+              city: true,
+              verificationStatus: true,
+              responseRate: true,
+              punctualityRate: true,
+              completionRate: true
+            }
+          }
+        },
         orderBy: { createdAt: "desc" }
       });
     }
@@ -63,11 +102,53 @@ export class BookingsService {
 
       return this.prisma.booking.findMany({
         where: { providerId: ownProfile.id },
+        include: {
+          service: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              basePrice: true,
+              durationMinutes: true
+            }
+          },
+          customer: {
+            select: {
+              id: true,
+              email: true
+            }
+          }
+        },
         orderBy: { scheduledAt: "asc" }
       });
     }
 
     return this.prisma.booking.findMany({
+      include: {
+        service: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            basePrice: true,
+            durationMinutes: true
+          }
+        },
+        provider: {
+          select: {
+            id: true,
+            fullName: true,
+            city: true,
+            verificationStatus: true
+          }
+        },
+        customer: {
+          select: {
+            id: true,
+            email: true
+          }
+        }
+      },
       orderBy: { createdAt: "desc" },
       take: 200
     });
@@ -106,18 +187,48 @@ export class BookingsService {
             userId: booking.customerId,
             kind: "review_request",
             channel: "in_app",
-            payload: { bookingId: booking.id },
+            payload: {
+              bookingId: booking.id,
+              message: "Tu reserva fue completada. Déjanos una reseña para cerrar el ciclo."
+            },
             scheduledAt: new Date(Date.now() + 10 * 60 * 1000)
           },
           {
             userId: booking.customerId,
             kind: "recurrence_offer",
             channel: "email",
-            payload: { bookingId: booking.id },
+            payload: {
+              bookingId: booking.id,
+              message: "¿Quieres repetir este servicio? Te ayudamos a programarlo."
+            },
             scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
           }
         ]
       });
+    }
+
+    if (user.role === "provider" || user.role === "admin") {
+      await this.pushNotificationSafe(
+        booking.customerId,
+        "booking_status_updated",
+        `Tu reserva ${booking.id.slice(0, 8)} cambió a ${payload.status}.`,
+        {
+          bookingId: booking.id,
+          status: payload.status
+        }
+      );
+    }
+
+    if (user.role === "customer" || user.role === "admin") {
+      await this.pushNotificationSafe(
+        booking.provider.userId,
+        "booking_status_updated",
+        `La reserva ${booking.id.slice(0, 8)} cambió a ${payload.status}.`,
+        {
+          bookingId: booking.id,
+          status: payload.status
+        }
+      );
     }
 
     return updated;
@@ -125,18 +236,41 @@ export class BookingsService {
 
   async markCheckIn(bookingId: string, user: AuthUser) {
     const booking = await this.getBookingForProviderAction(bookingId, user);
-    return this.prisma.booking.update({
+    const updated = await this.prisma.booking.update({
       where: { id: booking.id },
       data: { checkInAt: new Date() }
     });
+
+    await this.pushNotificationSafe(
+      booking.customerId,
+      "booking_check_in",
+      `El proveedor registró check-in para tu reserva ${booking.id.slice(0, 8)}.`,
+      {
+        bookingId: booking.id
+      }
+    );
+
+    return updated;
   }
 
   async markCheckOut(bookingId: string, user: AuthUser) {
     const booking = await this.getBookingForProviderAction(bookingId, user);
-    return this.prisma.booking.update({
+    const updated = await this.prisma.booking.update({
       where: { id: booking.id },
       data: { checkOutAt: new Date(), status: "completed" }
     });
+
+    await this.pushNotificationSafe(
+      booking.customerId,
+      "booking_check_out",
+      `El servicio de la reserva ${booking.id.slice(0, 8)} fue marcado como finalizado.`,
+      {
+        bookingId: booking.id,
+        status: "completed"
+      }
+    );
+
+    return updated;
   }
 
   async addEvidence(bookingId: string, payload: AddEvidenceDto, user: AuthUser) {
@@ -185,7 +319,35 @@ export class BookingsService {
 
   async listMyPlans(user: AuthUser) {
     if (user.role === "admin") {
-      return this.prisma.bookingPlan.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
+      return this.prisma.bookingPlan.findMany({
+        include: {
+          service: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              basePrice: true,
+              durationMinutes: true
+            }
+          },
+          provider: {
+            select: {
+              id: true,
+              fullName: true,
+              city: true,
+              verificationStatus: true
+            }
+          },
+          customer: {
+            select: {
+              id: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 200
+      });
     }
 
     if (user.role === "provider") {
@@ -199,12 +361,48 @@ export class BookingsService {
 
       return this.prisma.bookingPlan.findMany({
         where: { providerId: profile.id },
+        include: {
+          service: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              basePrice: true,
+              durationMinutes: true
+            }
+          },
+          customer: {
+            select: {
+              id: true,
+              email: true
+            }
+          }
+        },
         orderBy: { createdAt: "desc" }
       });
     }
 
     return this.prisma.bookingPlan.findMany({
       where: { customerId: user.userId },
+      include: {
+        service: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            basePrice: true,
+            durationMinutes: true
+          }
+        },
+        provider: {
+          select: {
+            id: true,
+            fullName: true,
+            city: true,
+            verificationStatus: true
+          }
+        }
+      },
       orderBy: { createdAt: "desc" }
     });
   }
@@ -374,5 +572,21 @@ export class BookingsService {
       where: { providerId, status: "completed" }
     });
     return completed / total;
+  }
+
+  private async pushNotificationSafe(
+    userId: string,
+    kind: string,
+    message: string,
+    payload: Record<string, string | number | boolean | null>
+  ) {
+    try {
+      await this.notifications.notifyInApp(userId, kind, {
+        message,
+        ...payload
+      });
+    } catch {
+      // Non-blocking notification publishing.
+    }
   }
 }

@@ -4,6 +4,8 @@ import { WorkspaceShell } from "@/components/shared/workspace-shell";
 
 const links = [
   ["/proveedor/dashboard", "Dashboard"],
+  ["/proveedor/reservas", "Reservas"],
+  ["/proveedor/notificaciones", "Notificaciones"],
   ["/proveedor/onboarding", "Onboarding"],
   ["/proveedor/servicios", "Servicios"],
   ["/proveedor/disponibilidad", "Disponibilidad"],
@@ -19,6 +21,8 @@ export default function ProviderHubPage() {
       description="Gestiona tu operación diaria, agenda y atención al cliente."
       links={[
         { href: "/proveedor/dashboard", label: "Dashboard" },
+        { href: "/proveedor/reservas", label: "Reservas" },
+        { href: "/proveedor/notificaciones", label: "Notificaciones" },
         { href: "/proveedor/servicios", label: "Servicios" },
         { href: "/proveedor/disponibilidad", label: "Disponibilidad" }
       ]}

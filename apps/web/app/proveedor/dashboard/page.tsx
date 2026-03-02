@@ -33,14 +33,16 @@ export default function ProviderDashboardPage() {
   }, []);
 
   const completed = useMemo(() => bookings.filter((item) => item.status === "completed").length, [bookings]);
+  const pending = useMemo(() => bookings.filter((item) => item.status === "pending").length, [bookings]);
 
   return (
     <main className="container py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Panel proveedor</h1>
       <p className="mt-2 text-sm text-muted-foreground">Operación diaria de reservas, mensajes y soporte.</p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 md:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-base">Reservas</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{bookings.length}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Pendientes</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{pending}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Completadas</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{completed}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Tickets</CardTitle></CardHeader><CardContent className="text-3xl font-semibold">{tickets.length}</CardContent></Card>
       </div>
@@ -48,6 +50,8 @@ export default function ProviderDashboardPage() {
       <div className="mt-6"><StatePanel state={state} /></div>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        <Button asChild><Link href="/proveedor/reservas">Gestionar reservas</Link></Button>
+        <Button asChild variant="outline"><Link href="/proveedor/notificaciones">Notificaciones</Link></Button>
         <Button asChild><Link href="/proveedor/servicios">Gestionar servicios</Link></Button>
         <Button asChild variant="outline"><Link href="/proveedor/disponibilidad">Disponibilidad</Link></Button>
         <Button asChild variant="outline"><Link href="/proveedor/mensajes">Mensajes</Link></Button>

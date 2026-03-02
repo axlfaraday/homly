@@ -41,6 +41,7 @@ export default function ProviderDetailPage() {
   const params = useParams<{ providerId: string }>();
   const providerId = params.providerId;
   const [state, setState] = useState<ApiState>("loading");
+  const [healthState, setHealthState] = useState<ApiState>("idle");
   const [provider, setProvider] = useState<ProviderProfile | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -52,20 +53,43 @@ export default function ProviderDetailPage() {
         const profiles = await apiFetch<ProviderProfile[]>("/providers");
         const found = profiles.find((item) => item.id === providerId) ?? null;
         if (!found) {
+          setHealthState("idle");
           setState("empty");
           return;
         }
 
-        const [serviceData, healthData] = await Promise.all([
+        setHealthState("loading");
+        const [serviceResult, healthResult] = await Promise.allSettled([
           apiFetch<ServiceItem[]>(`/catalog/services?providerId=${found.id}`),
           apiFetch<HealthResponse>(`/providers/${found.id}/health`)
         ]);
 
+        if (serviceResult.status !== "fulfilled") {
+          throw new Error("services_load_failed");
+        }
+
         setProvider(found);
-        setServices(serviceData.filter((item) => item.active));
-        setHealth(healthData);
+        setServices(serviceResult.value.filter((item) => item.active));
+
+        if (healthResult.status === "fulfilled") {
+          setHealth(healthResult.value);
+          setHealthState("success");
+        } else {
+          setHealth(null);
+          setHealthState("error");
+          void trackEvent("provider_health_unavailable", {
+            providerId: found.id
+          });
+        }
+
+        void trackEvent("provider_profile_viewed", {
+          providerId: found.id,
+          city: found.city
+        });
+
         setState("success");
       } catch {
+        setHealthState("idle");
         setState("error");
       }
     }
@@ -91,7 +115,12 @@ export default function ProviderDetailPage() {
     });
   }, [provider, services]);
 
-  const coverage = useMemo(() => provider?.coverage.join(", "), [provider]);
+  const coverage = useMemo(() => {
+    if (!provider || provider.coverage.length === 0) {
+      return "Sin cobertura especificada";
+    }
+    return provider.coverage.join(", ");
+  }, [provider]);
 
   return (
     <WorkspaceShell
@@ -104,7 +133,7 @@ export default function ProviderDetailPage() {
       ]}
     >
       <StatePanel state={state} />
-      {provider && health ? (
+      {provider ? (
         <div className="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Card>
             <CardHeader>
@@ -127,14 +156,53 @@ export default function ProviderDetailPage() {
               <CardTitle className="text-base">Salud operativa</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Rating: {health.averageRating ? health.averageRating.toFixed(1) : "N/A"} ({health.reviewCount})</p>
-              <p>Respuesta: {(health.responseRate * 100).toFixed(0)}%</p>
-              <p>Puntualidad: {(health.punctualityRate * 100).toFixed(0)}%</p>
-              <p>Cumplimiento: {(health.completionRate * 100).toFixed(0)}%</p>
-              <p>Score: {(health.healthScore * 100).toFixed(0)}/100</p>
+              {health ? (
+                <>
+                  <p>
+                    Rating: {health.averageRating ? health.averageRating.toFixed(1) : "N/A"} (
+                    {health.reviewCount})
+                  </p>
+                  <p>Respuesta: {(health.responseRate * 100).toFixed(0)}%</p>
+                  <p>Puntualidad: {(health.punctualityRate * 100).toFixed(0)}%</p>
+                  <p>Cumplimiento: {(health.completionRate * 100).toFixed(0)}%</p>
+                  <p>Score: {(health.healthScore * 100).toFixed(0)}/100</p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    No pudimos cargar los indicadores operativos en este momento. Puedes continuar
+                    con la reserva y volver a consultar luego.
+                  </p>
+                  {healthState === "loading" ? <p>Actualizando métricas...</p> : null}
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {provider ? (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="text-base">Compromisos de confianza</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Verificación del perfil:{" "}
+              <span className="text-foreground">
+                {provider.verificationStatus === "approved" ? "aprobada" : "en proceso"}
+              </span>
+              .
+            </p>
+            <p>
+              Política de cancelación: sin costo hasta 12h antes; después aplica cargo parcial.
+            </p>
+            <p>
+              Soporte operativo: seguimiento in-app y ticket de soporte disponible durante todo el
+              ciclo de la reserva.
+            </p>
+          </CardContent>
+        </Card>
       ) : null}
 
       {services.length > 0 ? (

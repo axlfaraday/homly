@@ -107,6 +107,10 @@ Seed demo local:
 - `PATCH /api/support/tickets/:ticketId/status`
 - `GET /api/messaging/bookings/:bookingId/messages`
 - `POST /api/messaging/bookings/:bookingId/messages`
+- `GET /api/notifications/mine`
+- `GET /api/notifications/unread-count`
+- `PATCH /api/notifications/:notificationId/read`
+- `PATCH /api/notifications/read-all`
 
 ## RBAC actual
 

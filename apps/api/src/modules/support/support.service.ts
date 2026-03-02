@@ -7,12 +7,16 @@ import {
 import type { SupportTicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/interfaces/auth-user.interface";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketStatusDto } from "./dto/update-ticket-status.dto";
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   async createTicket(payload: CreateTicketDto, user: AuthUser) {
     if (user.role !== "customer" && user.role !== "admin") {
@@ -45,7 +49,7 @@ export class SupportService {
       providerId = latestBooking?.providerId ?? null;
     }
 
-    return this.prisma.supportTicket.create({
+    const ticket = await this.prisma.supportTicket.create({
       data: {
         bookingId: payload.bookingId,
         customerId,
@@ -54,6 +58,26 @@ export class SupportService {
         description: payload.description
       }
     });
+
+    if (providerId) {
+      const provider = await this.prisma.providerProfile.findUnique({
+        where: { id: providerId },
+        select: { userId: true }
+      });
+      if (provider) {
+        await this.pushNotificationSafe(
+          provider.userId,
+          "support_ticket_created",
+          `Nuevo ticket ${ticket.id.slice(0, 8)}: ${ticket.subject}.`,
+          {
+            ticketId: ticket.id,
+            bookingId: ticket.bookingId ?? null
+          }
+        );
+      }
+    }
+
+    return ticket;
   }
 
   async listMine(user: AuthUser) {
@@ -95,7 +119,7 @@ export class SupportService {
     }
 
     this.assertCanUpdateStatus(user, ticket.provider?.userId, payload.status);
-    return this.prisma.supportTicket.update({
+    const updated = await this.prisma.supportTicket.update({
       where: { id: ticketId },
       data: {
         status: payload.status,
@@ -105,6 +129,18 @@ export class SupportService {
             : ticket.resolutionNote
       }
     });
+
+    await this.pushNotificationSafe(
+      ticket.customerId,
+      "support_ticket_updated",
+      `Tu ticket ${ticket.id.slice(0, 8)} cambió a ${payload.status}.`,
+      {
+        ticketId: ticket.id,
+        status: payload.status
+      }
+    );
+
+    return updated;
   }
 
   private assertCanUpdateStatus(
@@ -126,6 +162,22 @@ export class SupportService {
 
     if (nextStatus === "open") {
       throw new BadRequestException("provider_cannot_reopen_ticket");
+    }
+  }
+
+  private async pushNotificationSafe(
+    userId: string,
+    kind: string,
+    message: string,
+    payload: Record<string, string | number | boolean | null>
+  ) {
+    try {
+      await this.notifications.notifyInApp(userId, kind, {
+        message,
+        ...payload
+      });
+    } catch {
+      // Non-blocking notification publishing.
     }
   }
 }

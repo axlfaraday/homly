@@ -6,6 +6,7 @@ import { WorkspaceShell } from "@/components/shared/workspace-shell";
 const links = [
   ["/app/buscar", "Buscar y contratar"],
   ["/app/reservas", "Reservas y estado"],
+  ["/app/notificaciones", "Notificaciones"],
   ["/app/mensajes", "Mensajes"],
   ["/app/soporte", "Soporte"],
   ["/app/perfil", "Perfil"]
@@ -21,7 +22,8 @@ export default function AppHubPage() {
         links={[
           { href: "/app/dashboard", label: "Dashboard" },
           { href: "/app/buscar", label: "Contratar servicio" },
-          { href: "/app/reservas", label: "Ver reservas" }
+          { href: "/app/reservas", label: "Ver reservas" },
+          { href: "/app/notificaciones", label: "Notificaciones" }
         ]}
       >
         <div className="mt-6 grid gap-3 md:grid-cols-2">

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { StatePanel } from "@/components/shared/state-panel";
 import { API_URL, ApiState } from "@/lib/api";
+import { resolveErrorMessage } from "@/lib/error-utils";
 import { persistSession, readStoredSession, resolvePostAuthPath, type AppRole } from "@/lib/session";
 
 function asRole(value: unknown): AppRole {
@@ -62,7 +63,13 @@ export default function RegisterPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(JSON.stringify(data));
+        const msg =
+          typeof data?.message === "string"
+            ? data.message
+            : Array.isArray(data?.message)
+              ? data.message.join(", ")
+              : "No fue posible crear la cuenta.";
+        throw new Error(msg);
       }
 
       const createdRole = asRole(data.user?.role);
@@ -76,7 +83,7 @@ export default function RegisterPage() {
       router.push(resolvePostAuthPath(createdRole, searchParams.get("next")));
     } catch (error) {
       setState("error");
-      setFeedback(error instanceof Error ? error.message : "No fue posible completar el registro.");
+      setFeedback(resolveErrorMessage(error, "No fue posible completar el registro."));
     }
   }
 

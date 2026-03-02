@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatePanel } from "@/components/shared/state-panel";
 import { API_URL, ApiState } from "@/lib/api";
+import { resolveErrorMessage } from "@/lib/error-utils";
 import { persistSession, readStoredSession, resolvePostAuthPath, type AppRole } from "@/lib/session";
 
 function asRole(value: unknown): AppRole {
@@ -75,7 +76,7 @@ export default function LoginPage() {
       router.push(resolvePostAuthPath(role, searchParams.get("next")));
     } catch (error) {
       setState("error");
-      setFeedback(error instanceof Error ? error.message : "No fue posible iniciar sesión.");
+      setFeedback(resolveErrorMessage(error, "No fue posible iniciar sesión."));
     }
   }
 

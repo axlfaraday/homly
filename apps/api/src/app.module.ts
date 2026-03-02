@@ -9,6 +9,7 @@ import { AvailabilityModule } from "./modules/availability/availability.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ProvidersModule } from "./modules/providers/providers.module";
 import { ReviewsModule } from "./modules/reviews/reviews.module";
@@ -32,6 +33,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     AvailabilityModule,
     BookingsModule,
     PaymentsModule,
+    NotificationsModule,
     MessagingModule,
     ReviewsModule,
     SupportModule,
